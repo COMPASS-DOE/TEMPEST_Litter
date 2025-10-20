@@ -1,0 +1,21 @@
+"0","library(dplyr)"
+"2","
+Attaching package: ‘dplyr’
+
+"
+"2","The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+"
+"2","The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+"
+"0","litter %>% "
+"0","  mutate(All_Leaf = if_else(is.na(All_Leaf),"
+"0","                            Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,"
+"0","                            All_Leaf)) ->"
+"0","  litter"
+"0",""

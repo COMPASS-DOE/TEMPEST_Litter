@@ -1,0 +1,83 @@
+---
+title: "Alice's TEMPEST litter analysis"
+author: "AES"
+date: "2025-10-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Read in Data
+
+```{r read-data}
+library(readr)
+litter <- read_csv("TEMPEST litter data - Masses.csv", skip = 1, show_col_types = FALSE) 
+library(lubridate)
+litter$Date_collected <- mdy(litter$Date_collected)
+## drop columns we don't care about
+litter$Collection_Year <- litter$Collection_DOY <- litter$Date_sorted <- 
+  litter$Date_entered <- litter$Entered_by <- litter$Notes <- NULL
+
+message("data read ok! rows = ", nrow(litter))
+
+```
+## Calculate/fill in All-Leaf column
+
+```{r fill all leaf}
+library(dplyr)
+litter %>% 
+  mutate(All_Leaf = if_else(is.na(All_Leaf),
+                            Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
+                            All_Leaf)) ->
+  litter
+
+```
+
+## For next time, we want to turn these collection masses into daily fluxes
+## Step 1: We want to know how long its been since the last collection
+
+```{r}
+
+```
+
+## Step 2: We want to take leaf biomass and divide it by the time computed in Step 1
+## Step 3: We wnat to interpolate rates between collection dates
+## Step 4: We want to compute cummulative litter fall across the year
+
+## Basic Visualization
+
+```{r basicvis, echo=FALSE}
+library(ggplot2)
+
+ggplot(data = litter, aes(Date_collected, Leaf_LITU, color = Plot)) + geom_point(na.rm = TRUE)
+
+ggplot(data = litter, aes(Date_collected, Leaf_ACRU, color = Plot)) + geom_point(na.rm = TRUE)
+
+ggplot(data = litter, aes(Date_collected, Leaf_FAGR, color = Plot)) + geom_point(na.rm = TRUE)
+
+ggplot(data = litter, aes(Date_collected, Leaf_Other, color = Plot)) + geom_point(na.rm = TRUE)
+
+ggplot(data = litter, aes(Date_collected, All_Leaf, color = Plot)) + geom_point(na.rm = TRUE)
+```
+
+## Species average over time
+
+```{r}
+library(tidyr)
+litter %>%
+  group_by(Plot, Date_collected) %>%
+  summarise(Leaf_ACRU = mean(Leaf_ACRU, na.rm = TRUE), 
+            Leaf_FAGR = mean(Leaf_FAGR, na.rm = TRUE),
+            Leaf_LITU = mean(Leaf_LITU, na.rm = TRUE),
+            Leaf_Other = mean(Leaf_Other, na.rm = TRUE), .groups = "drop") %>%
+  pivot_longer(starts_with("Leaf_")) ->
+  litter_smry
+
+ggplot(litter_smry, aes(Date_collected, value, color = Plot)) + geom_line() + facet_grid(name ~ .)
+
+```
+
+## 
+
