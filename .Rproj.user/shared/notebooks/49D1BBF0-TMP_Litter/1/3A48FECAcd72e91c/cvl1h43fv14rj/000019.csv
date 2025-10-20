@@ -1,0 +1,8 @@
+"0","litter %>%
+  mutate(Year = year(Date_collected)) %>%
+  group_by(Plot, Year) %>%
+  summarize(All_Leaf_annual = sum(All_Leaf,na.rm = TRUE)) %>%
+  filter(!is.na(Year)) %>%
+  ggplot(aes(Year, All_Leaf_annual, color = Plot)) + geom_line()
+"
+"2","`summarise()` has grouped output by 'Plot'. You can override using the `.groups` argument."

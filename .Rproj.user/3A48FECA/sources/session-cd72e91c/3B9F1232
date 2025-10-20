@@ -3,9 +3,9 @@
     "path": "C:/Users/stearnsa/OneDrive - Smithsonian Institution/Desktop/TMP_Litter.Rmd",
     "project_path": null,
     "type": "r_markdown",
-    "hash": "3182896524",
+    "hash": "0",
     "contents": "",
-    "dirty": false,
+    "dirty": true,
     "created": 1760544575909.0,
     "source_on_save": false,
     "relative_order": 1,
@@ -13,8 +13,8 @@
         "tempName": "Untitled1",
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "47,0",
-        "scrollLine": "33",
+        "cursorPosition": "108,3",
+        "scrollLine": "95",
         "last_setup_crc32": "cd72e91cbb338d19"
     },
     "folds": "",
@@ -22,7 +22,7 @@
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1760969183591,
+    "last_content_update": 1760972641362,
     "read_only": false,
     "read_only_alternatives": []
 }
