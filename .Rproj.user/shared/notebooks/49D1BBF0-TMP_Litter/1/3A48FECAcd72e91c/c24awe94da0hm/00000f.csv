@@ -1,5 +1,0 @@
-"0",""
-"0","litter %>%"
-"0","  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->"
-"0","  litter"
-"0",""
