@@ -39,6 +39,18 @@ litter %>%
 ## Step 1: We want to know how long its been since the last collection
 
 ```{r}
+# for each plot and trap we want to compute the days
+
+litter %>%
+  group_by(Plot, Trap) %>% 
+  arrange(Date_collected) %>%
+  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
+  ungroup() %>%
+  arrange(Plot, Trap) %>% 
+  ## finally compute flux: litter per day
+  mutate(All_Leaf_perday = All_Leaf/elapsed_days) ->
+  litter
+
 
 ```
 
@@ -51,6 +63,8 @@ litter %>%
 ```{r basicvis, echo=FALSE}
 library(ggplot2)
 
+## plot biomass
+
 ggplot(data = litter, aes(Date_collected, Leaf_LITU, color = Plot)) + geom_point(na.rm = TRUE)
 
 ggplot(data = litter, aes(Date_collected, Leaf_ACRU, color = Plot)) + geom_point(na.rm = TRUE)
@@ -60,6 +74,11 @@ ggplot(data = litter, aes(Date_collected, Leaf_FAGR, color = Plot)) + geom_point
 ggplot(data = litter, aes(Date_collected, Leaf_Other, color = Plot)) + geom_point(na.rm = TRUE)
 
 ggplot(data = litter, aes(Date_collected, All_Leaf, color = Plot)) + geom_point(na.rm = TRUE)
+
+##  plot flux
+
+ggplot(data = litter, aes(Date_collected, All_Leaf_perday, color = Plot)) + geom_point(na.rm = TRUE)
+
 ```
 
 ## Species average over time
