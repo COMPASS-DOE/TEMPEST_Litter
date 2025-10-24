@@ -37,6 +37,7 @@ litter %>%
 
 ## For next time, we want to turn these collection masses into daily fluxes
 ## Step 1: We want to know how long its been since the last collection
+## Step 2: We want to take leaf biomass and divide it by the time computed in Step 1
 
 ```{r}
 # for each plot and trap we want to compute the days
@@ -54,8 +55,19 @@ litter %>%
 
 ```
 
-## Step 2: We want to take leaf biomass and divide it by the time computed in Step 1
-## Step 3: We wnat to interpolate rates between collection dates
+
+## Step 3: We want to interpolate rates between collection dates
+
+```{r}
+
+## to interpolate between two dates, we need to create empty rows
+## for example, if we collected on 10/1 and 10/10 right not we only have those rows in our data set
+## so we need to create row form 10/2 . . . 10/9 and then interpolate between the 10/1 flux and 10/10 flux to fill in those rows
+## we will use complete() to generate the non-measured intervening dates
+## and then we will use approx() to interpolate
+```
+
+
 ## Step 4: We want to compute cummulative litter fall across the year
 
 ## Basic Visualization
