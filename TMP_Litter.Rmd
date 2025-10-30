@@ -7,26 +7,27 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+library(lubridate)
+library(dplyr)
 ```
 
 ## Read in Data
 
 ```{r read-data}
-library(readr)
 litter <- read_csv("TEMPEST litter data - Masses.csv", skip = 1, show_col_types = FALSE) 
-library(lubridate)
 litter$Date_collected <- mdy(litter$Date_collected)
 ## drop columns we don't care about
 litter$Collection_Year <- litter$Collection_DOY <- litter$Date_sorted <- 
   litter$Date_entered <- litter$Entered_by <- litter$Notes <- NULL
 
 message("data read ok! rows = ", nrow(litter))
-
 ```
+
 ## Calculate/fill in All-Leaf column
 
 ```{r fill all leaf}
-library(dplyr)
 litter %>% 
   mutate(All_Leaf = if_else(is.na(All_Leaf),
                             Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
@@ -52,9 +53,7 @@ litter %>%
   mutate(All_Leaf_perday = All_Leaf/elapsed_days) ->
   litter
 
-
 ```
-
 
 ## Step 3: We want to interpolate rates between collection dates
 
@@ -64,7 +63,21 @@ litter %>%
 ## for example, if we collected on 10/1 and 10/10 right not we only have those rows in our data set
 ## so we need to create row form 10/2 . . . 10/9 and then interpolate between the 10/1 flux and 10/10 flux to fill in those rows
 ## we will use complete() to generate the non-measured intervening dates
-## and then we will use approx() to interpolate
+## and then we will use zoo::na.approx() to interpolate
+
+# complete() can be word to wrap your head around
+# or at least it is for me! Some examples:
+
+library(tidyr)
+# Missing group combinations
+test <- tibble(group = c("A", "B", "B"),
+               level = c(1, 1, 2), 
+               values = c(4, 5, 6))
+test %>% complete(group, level)
+
+# Missing timepoints
+test <- tibble(time = c(1, 2, 5), values = c(4, 5, 6))
+test %>% complete(time = 1:5)
 ```
 
 
