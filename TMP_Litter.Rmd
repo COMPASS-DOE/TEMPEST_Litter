@@ -76,8 +76,21 @@ test <- tibble(group = c("A", "B", "B"),
 test %>% complete(group, level)
 
 # Missing timepoints
-test <- tibble(time = c(1, 2, 5), values = c(4, 5, 6))
+library(zoo)
+test <- tibble(time = c(1, 2, 5), values = c(4, 5, 9))
+#complete for all time values 1 thru 5
 test %>% complete(time = 1:5)
+## take the na's and fill in the interpolated values based on pre and post gap values
+test %>% complete(time = 1:5) %>% mutate(values=na.approx(values))
+
+#date example
+test <- tibble(day = mdy(c("10/20/2021", "10/31/2021")),
+               values = c(60, 97))
+test %>% complete(day = seq(min(day), max(day), by = "day")) %>% 
+  mutate(values=na.approx(values))
+
+
+
 ```
 
 
