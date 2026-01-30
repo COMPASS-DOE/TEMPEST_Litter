@@ -139,6 +139,35 @@ ggplot(litter_C_A_2019,aes(x = Date_collected, y = All_Leaf)) + geom_point()
 
 ```
 
+```{r}
+## attempt to graph Control trap A over all years
+
+litter %>% 
+  filter(Plot == "C", Trap == "A") %>% 
+  select(Plot, Trap, Date_collected, All_Leaf) ->
+  litter_C_A_allyears
+
+
+# not sure I need the below ??
+days_wanted <- seq(from = min(litter_C_A_allyears$Date_collected), 
+                   to = max(litter_C_A_allyears$Date_collected), 
+                   by = "day")
+
+# do need this:
+days_wanted <- seq(from = ymd ("2018-11-08"), 
+                   to = ymd ("2024-12-31"), 
+                   by = "day")
+
+
+litter_C_A_allyears %>%
+  complete(Plot, Trap, Date_collected = days_wanted) %>%
+  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  litter_C_A_daily
+
+ggplot(litter_C_A_daily,aes(x = Date_collected, y = All_Leaf)) + geom_point()
+
+```
+
 
 ## Step 4: We want to compute cumulative litter fall across the year
 
