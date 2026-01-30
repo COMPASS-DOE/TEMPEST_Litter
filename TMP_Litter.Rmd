@@ -48,11 +48,14 @@ litter %>%
 litter %>%
   group_by(Plot, Trap) %>% 
   arrange(Date_collected) %>%
+  # compute the difference between collection dates. For a series of
+  # size n, diff() returns n-1 intervals, so we add one NA at the front
+  # because the first date has no elapsed time (since no previous date)
   mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
   ungroup() %>%
   arrange(Plot, Trap) %>% 
   ## finally compute flux: litter per day
-  mutate(All_Leaf_perday = All_Leaf/elapsed_days) ->
+  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
   litter
 
 ```
@@ -98,6 +101,16 @@ litter_test %>%
   complete(Date_collected = seq(min(Date_collected), max(Date_collected), by = "day")) %>% 
   mutate(values=na.approx(values))
 
+# Examine: just the control 'A' trap
+litter %>% 
+  filter(Plot == "C", Trap == "A", year(Date_collected) == 2019) %>% 
+  select(Plot, Trap, Date_collected, All_Leaf) ->
+  litter_C_A_example
+
+# For today:
+# 1. Go over the benefit of working with a small test dataset
+# 2. Understand the filter and select steps above
+# 3. Use complete() and the zoo::approx() to estimate daily flux over entire year
 
 ```
 
