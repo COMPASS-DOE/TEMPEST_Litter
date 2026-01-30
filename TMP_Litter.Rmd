@@ -109,6 +109,31 @@ litter %>%
 
 # For today:
 # 1. Go over the benefit of working with a small test dataset
+
+# generate between first and last collection dates
+
+days_wanted <- seq(from = min(litter_C_A_example$Date_collected), 
+                   to = max(litter_C_A_example$Date_collected), 
+                   by = "day")
+
+# generate for the entire year
+
+days_wanted <- seq(from = ymd ("2019-01-01"), 
+                   to = ymd ("2019-12-31"), 
+                   by = "day")
+
+# for all combination of plot and trap we want all days for all combinations of plot and trap
+
+litter_C_A_example %>%
+  complete(Plot, Trap, Date_collected = days_wanted) %>%
+  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  litter_C_A_2019
+  
+# have rows ready for interpolation
+
+library(ggplot2)
+ggplot(litter_C_A_2019,aes(x = Date_collected, y = All_Leaf)) + geom_point()
+
 # 2. Understand the filter and select steps above
 # 3. Use complete() and the zoo::approx() to estimate daily flux over entire year
 
