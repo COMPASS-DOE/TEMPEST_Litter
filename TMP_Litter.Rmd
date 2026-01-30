@@ -17,6 +17,7 @@ library(dplyr)
 
 ```{r read-data}
 litter <- read_csv("TEMPEST litter data - Masses.csv", skip = 1, show_col_types = FALSE) 
+## convert date collected column into an actual date format
 litter$Date_collected <- mdy(litter$Date_collected)
 ## drop columns we don't care about
 litter$Collection_Year <- litter$Collection_DOY <- litter$Date_sorted <- 
@@ -28,10 +29,11 @@ message("data read ok! rows = ", nrow(litter))
 ## Calculate/fill in All-Leaf column
 
 ```{r fill all leaf}
+## if else means; condition is na is all leaf; if true add species and put in all leaf; if false use what is in all leaf
 litter %>% 
-  mutate(All_Leaf = if_else(is.na(All_Leaf),
-                            Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
-                            All_Leaf)) ->
+  mutate(All_Leaf = if_else(condition = is.na(All_Leaf),
+                            true = Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
+                            false = All_Leaf)) ->
   litter
 
 ```
@@ -60,12 +62,12 @@ litter %>%
 ```{r}
 
 ## to interpolate between two dates, we need to create empty rows
-## for example, if we collected on 10/1 and 10/10 right not we only have those rows in our data set
-## so we need to create row form 10/2 . . . 10/9 and then interpolate between the 10/1 flux and 10/10 flux to fill in those rows
+## for example, if we collected on 10/1 and 10/10 right now we only have those rows in our data set
+## so we need to create rows from 10/2 . . . 10/9 and then interpolate between the 10/1 flux and 10/10 flux to fill in those rows
 ## we will use complete() to generate the non-measured intervening dates
 ## and then we will use zoo::na.approx() to interpolate
 
-# complete() can be word to wrap your head around
+# complete() can be work to wrap your head around
 # or at least it is for me! Some examples:
 
 library(tidyr)
@@ -89,12 +91,18 @@ test <- tibble(day = mdy(c("10/20/2021", "10/31/2021")),
 test %>% complete(day = seq(min(day), max(day), by = "day")) %>% 
   mutate(values=na.approx(values))
 
+# want to group by plot and trap the do above interpolation
+
+litter_test %>%
+  group_by(Plot, Trap) %>%
+  complete(Date_collected = seq(min(Date_collected), max(Date_collected), by = "day")) %>% 
+  mutate(values=na.approx(values))
 
 
 ```
 
 
-## Step 4: We want to compute cummulative litter fall across the year
+## Step 4: We want to compute cumulative litter fall across the year
 
 ## Basic Visualization
 
