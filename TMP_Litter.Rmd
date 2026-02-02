@@ -168,6 +168,22 @@ ggplot(litter_C_A_daily,aes(x = Date_collected, y = All_Leaf)) + geom_point()
 
 ```
 
+```{r}
+# attempt to graph all traps in control plot interpolated
+
+litter %>% 
+  filter(Plot == "S") %>% 
+  select(Plot, Trap, Date_collected, All_Leaf) ->
+  litter_S_alltraps
+
+litter_S_alltraps %>%
+  complete(Plot, Trap, Date_collected = days_wanted) %>%
+  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  litter_S_daily
+
+ggplot(litter_S_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) + geom_point()
+
+```
 
 ## Step 4: We want to compute cumulative litter fall across the year
 
