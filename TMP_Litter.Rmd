@@ -1,7 +1,7 @@
 ---
 title: "Alice's TEMPEST litter analysis"
 author: "AES"
-date: "2025-10-10"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
@@ -11,17 +11,21 @@ knitr::opts_chunk$set(echo = TRUE)
 library(readr)
 library(lubridate)
 library(dplyr)
+library(ggplot2)
+theme_set(theme_bw())
 ```
 
 ## Read in Data
 
 ```{r read-data}
-litter <- read_csv("TEMPEST litter data - Masses.csv", skip = 1, show_col_types = FALSE) 
+litter <- read_csv("TEMPEST litter data - Masses.csv", 
+                   skip = 1, show_col_types = FALSE) 
 ## convert date collected column into an actual date format
 litter$Date_collected <- mdy(litter$Date_collected)
 ## drop columns we don't care about
-litter$Collection_Year <- litter$Collection_DOY <- litter$Date_sorted <- 
-  litter$Date_entered <- litter$Entered_by <- litter$Notes <- NULL
+litter$Collection_Year <- litter$Collection_DOY <- 
+  litter$Date_sorted <- litter$Date_entered <- 
+  litter$Entered_by <- litter$Notes <- NULL
 
 message("data read ok! rows = ", nrow(litter))
 ```
@@ -38,9 +42,9 @@ litter %>%
 
 ```
 
-## For next time, we want to turn these collection masses into daily fluxes
-## Step 1: We want to know how long its been since the last collection
-## Step 2: We want to take leaf biomass and divide it by the time computed in Step 1
+## Turn these collection masses into daily fluxes
+## Step 1: Calculate how long it's been since the last collection
+## Step 2: Divide leaf litter biomass by the time computed in Step 1
 
 ```{r}
 # for each plot and trap we want to compute the days
@@ -60,7 +64,7 @@ litter %>%
 
 ```
 
-## Step 3: We want to interpolate rates between collection dates
+## Step 3: Interpolate rates between collection dates
 
 ```{r}
 
@@ -70,38 +74,14 @@ litter %>%
 ## we will use complete() to generate the non-measured intervening dates
 ## and then we will use zoo::na.approx() to interpolate
 
-# complete() can be work to wrap your head around
-# or at least it is for me! Some examples:
-
-library(tidyr)
-# Missing group combinations
-test <- tibble(group = c("A", "B", "B"),
-               level = c(1, 1, 2), 
-               values = c(4, 5, 6))
-test %>% complete(group, level)
-
-# Missing timepoints
-library(zoo)
-test <- tibble(time = c(1, 2, 5), values = c(4, 5, 9))
-#complete for all time values 1 thru 5
-test %>% complete(time = 1:5)
-## take the na's and fill in the interpolated values based on pre and post gap values
-test %>% complete(time = 1:5) %>% mutate(values=na.approx(values))
-
-#date example
+# Date example
 test <- tibble(day = mdy(c("10/20/2021", "10/31/2021")),
                values = c(60, 97))
-test %>% complete(day = seq(min(day), max(day), by = "day")) %>% 
-  mutate(values=na.approx(values))
+test %>% 
+  complete(day = seq(min(day), max(day), by = "day")) %>% 
+  mutate(values = na.approx(values))
 
-# want to group by plot and trap the do above interpolation
-
-litter_test %>%
-  group_by(Plot, Trap) %>%
-  complete(Date_collected = seq(min(Date_collected), max(Date_collected), by = "day")) %>% 
-  mutate(values=na.approx(values))
-
-# Examine: just the control 'A' trap
+# Examine: just the control 'A' trap in 2019
 litter %>% 
   filter(Plot == "C", Trap == "A", year(Date_collected) == 2019) %>% 
   select(Plot, Trap, Date_collected, All_Leaf) ->
@@ -110,32 +90,28 @@ litter %>%
 # For today:
 # 1. Go over the benefit of working with a small test dataset
 
-# generate between first and last collection dates
-
+# Generate between first and last collection dates
 days_wanted <- seq(from = min(litter_C_A_example$Date_collected), 
                    to = max(litter_C_A_example$Date_collected), 
                    by = "day")
 
-# generate for the entire year
-
+# Generate for the entire year
 days_wanted <- seq(from = ymd ("2019-01-01"), 
                    to = ymd ("2019-12-31"), 
                    by = "day")
 
-# for all combination of plot and trap we want all days for all combinations of plot and trap
+# For all combination of plot and trap we want all days for all combinations of plot and trap
 
 litter_C_A_example %>%
   complete(Plot, Trap, Date_collected = days_wanted) %>%
-  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) ->
   litter_C_A_2019
-  
-# have rows ready for interpolation
 
-library(ggplot2)
-ggplot(litter_C_A_2019,aes(x = Date_collected, y = All_Leaf)) + geom_point()
+# Visualize our example control A 2019 data
 
-# 2. Understand the filter and select steps above
-# 3. Use complete() and the zoo::approx() to estimate daily flux over entire year
+ggplot(litter_C_A_2019, aes(x = Date_collected, y = All_Leaf)) +
+  geom_point()
+
 
 ```
 
@@ -147,13 +123,14 @@ litter %>%
   select(Plot, Trap, Date_collected, All_Leaf) ->
   litter_C_A_allyears
 
-
 # not sure I need the below ??
+# TODO: talk about this
 days_wanted <- seq(from = min(litter_C_A_allyears$Date_collected), 
                    to = max(litter_C_A_allyears$Date_collected), 
                    by = "day")
 
 # do need this:
+# TODO: talk about this
 days_wanted <- seq(from = ymd ("2018-11-08"), 
                    to = ymd ("2024-12-31"), 
                    by = "day")
@@ -169,7 +146,7 @@ ggplot(litter_C_A_daily,aes(x = Date_collected, y = All_Leaf)) + geom_point()
 ```
 
 ```{r}
-# attempt to graph all traps in control plot interpolated
+# Graph all traps in salt plot interpolated
 
 litter %>% 
   filter(Plot == "S") %>% 
@@ -177,26 +154,14 @@ litter %>%
   litter_S_alltraps
 
 litter_S_alltraps %>%
+  # TODO: talk about this
   complete(Plot, Trap, Date_collected = days_wanted) %>%
-  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) ->
   litter_S_daily
 
-ggplot(litter_S_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) + geom_point()
+ggplot(litter_S_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) +
+  geom_point()
 
-```
-
-```{r}
-litter %>% 
-  filter(Plot == "F") %>% 
-  select(Plot, Trap, Date_collected, All_Leaf) ->
-  litter_F_alltraps
-
-litter_F_alltraps %>%
-  complete(Plot, Trap, Date_collected = days_wanted) %>%
-  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
-  litter_F_daily
-
-ggplot(litter_F_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) + geom_point()
 ```
 
 
