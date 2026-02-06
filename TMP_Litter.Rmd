@@ -185,6 +185,21 @@ ggplot(litter_S_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) + geo
 
 ```
 
+```{r}
+litter %>% 
+  filter(Plot == "F") %>% 
+  select(Plot, Trap, Date_collected, All_Leaf) ->
+  litter_F_alltraps
+
+litter_F_alltraps %>%
+  complete(Plot, Trap, Date_collected = days_wanted) %>%
+  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  litter_F_daily
+
+ggplot(litter_F_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) + geom_point()
+```
+
+
 ## Step 4: We want to compute cumulative litter fall across the year
 
 ## Basic Visualization
