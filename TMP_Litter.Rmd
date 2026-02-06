@@ -12,6 +12,8 @@ library(readr)
 library(lubridate)
 library(dplyr)
 library(ggplot2)
+library(tidyr)
+library(zoo)
 theme_set(theme_bw())
 ```
 
@@ -90,17 +92,17 @@ litter %>%
 # For today:
 # 1. Go over the benefit of working with a small test dataset
 
-# Generate between first and last collection dates
+# Generate a sequence between first and last collection dates
 days_wanted <- seq(from = min(litter_C_A_example$Date_collected), 
                    to = max(litter_C_A_example$Date_collected), 
                    by = "day")
 
-# Generate for the entire year
-days_wanted <- seq(from = ymd ("2019-01-01"), 
-                   to = ymd ("2019-12-31"), 
-                   by = "day")
+# Just as an EXAMPLE Generate for the entire year NOT IDEAL: this hard-codes dates which we don't want to do
+## days_wanted <- seq(from = ymd ("2019-01-01"), 
+                  # to = ymd ("2019-12-31"), 
+                  # by = "day")
 
-# For all combination of plot and trap we want all days for all combinations of plot and trap
+# We want all days for all combinations of plot and trap
 
 litter_C_A_example %>%
   complete(Plot, Trap, Date_collected = days_wanted) %>%
@@ -123,27 +125,31 @@ litter %>%
   select(Plot, Trap, Date_collected, All_Leaf) ->
   litter_C_A_allyears
 
-# not sure I need the below ??
-# TODO: talk about this
-days_wanted <- seq(from = min(litter_C_A_allyears$Date_collected), 
-                   to = max(litter_C_A_allyears$Date_collected), 
+days_wanted <- seq(from = min(litter_C_A_allyears$Date_collected, na.rm = TRUE), 
+                   to = max(litter_C_A_allyears$Date_collected, na.rm = TRUE), 
                    by = "day")
-
-# do need this:
-# TODO: talk about this
-days_wanted <- seq(from = ymd ("2018-11-08"), 
-                   to = ymd ("2024-12-31"), 
-                   by = "day")
-
 
 litter_C_A_allyears %>%
   complete(Plot, Trap, Date_collected = days_wanted) %>%
-  mutate(All_Leaf = na.approx(All_Leaf,na.rm = FALSE)) ->
+  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) %>% 
+  # add a column for year;for each year, compute cumulative flux
+  mutate(Year_Collected = year(Date_collected)) %>% 
+  group_by(Year_Collected) %>% 
+  mutate(All_Leaf_Cumulative = cumsum(All_Leaf)) ->
   litter_C_A_daily
 
-ggplot(litter_C_A_daily,aes(x = Date_collected, y = All_Leaf)) + geom_point()
+
+ggplot(litter_C_A_daily, aes(x = Date_collected, y = All_Leaf)) + geom_point() +
+  ylab("Leaf Litter Flux (g/day)") +
+  xlab("Date")
+
+ggplot(litter_C_A_daily, aes(x = yday(Date_collected), y = All_Leaf_Cumulative, color = Year_Collected)) +
+  geom_point()
 
 ```
+
+
+
 
 ```{r}
 # Graph all traps in salt plot interpolated
