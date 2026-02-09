@@ -22,12 +22,15 @@ theme_set(theme_bw())
 ```{r read-data}
 litter <- read_csv("TEMPEST litter data - Masses.csv", 
                    skip = 1, show_col_types = FALSE) 
-## convert date collected column into an actual date format
-litter$Date_collected <- mdy(litter$Date_collected)
-## drop columns we don't care about
-litter$Collection_Year <- litter$Collection_DOY <- 
-  litter$Date_sorted <- litter$Date_entered <- 
-  litter$Entered_by <- litter$Notes <- NULL
+## Convert date collected column into an actual date format,
+## and isolate columns we care about
+litter %>%
+  filter(!is.na(Date_collected)) %>% 
+  mutate(Date_collected = mdy(Date_collected),
+         Year = year(Date_collected)) %>% 
+  select(Plot, Trap, Date_collected, Year, 
+         Leaf_ACRU, Leaf_FAGR, Leaf_LITU, Leaf_Other, All_Leaf) ->
+  litter
 
 message("data read ok! rows = ", nrow(litter))
 ```
@@ -45,21 +48,22 @@ litter %>%
 ```
 
 ## Turn these collection masses into daily fluxes
-## Step 1: Calculate how long it's been since the last collection
-## Step 2: Divide leaf litter biomass by the time computed in Step 1
 
-```{r}
+* Step 1: Calculate how long it's been since the last collection
+* Step 2: Divide leaf litter biomass by the time computed in Step 1
+
+```{r calc-daily-fluxes}
 # for each plot and trap we want to compute the days
 
 litter %>%
-  group_by(Plot, Trap) %>% 
   arrange(Date_collected) %>%
+  group_by(Plot, Trap) %>% 
   # compute the difference between collection dates. For a series of
   # size n, diff() returns n-1 intervals, so we add one NA at the front
   # because the first date has no elapsed time (since no previous date)
   mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
   ungroup() %>%
-  arrange(Plot, Trap) %>% 
+  arrange(Plot, Trap, Date_collected) %>% 
   ## finally compute flux: litter per day
   mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
   litter
@@ -68,7 +72,9 @@ litter %>%
 
 ## Step 3: Interpolate rates between collection dates
 
-```{r}
+### Control A 2019 example
+
+```{r control-a-2019-example}
 
 ## to interpolate between two dates, we need to create empty rows
 ## for example, if we collected on 10/1 and 10/10 right now we only have those rows in our data set
@@ -89,15 +95,13 @@ litter %>%
   select(Plot, Trap, Date_collected, All_Leaf) ->
   litter_C_A_example
 
-# For today:
-# 1. Go over the benefit of working with a small test dataset
-
 # Generate a sequence between first and last collection dates
 days_wanted <- seq(from = min(litter_C_A_example$Date_collected), 
                    to = max(litter_C_A_example$Date_collected), 
                    by = "day")
 
-# Just as an EXAMPLE Generate for the entire year NOT IDEAL: this hard-codes dates which we don't want to do
+# Just as an EXAMPLE Generate for the entire year NOT IDEAL as
+# this hard-codes dates which we don't want to do
 ## days_wanted <- seq(from = ymd ("2019-01-01"), 
                   # to = ymd ("2019-12-31"), 
                   # by = "day")
@@ -114,59 +118,178 @@ litter_C_A_example %>%
 ggplot(litter_C_A_2019, aes(x = Date_collected, y = All_Leaf)) +
   geom_point()
 
-
 ```
 
-```{r}
-## attempt to graph Control trap A over all years
+### Control trap A over all years
+
+```{r control-A-example}
+## Control trap A over all years
 
 litter %>% 
   filter(Plot == "C", Trap == "A") %>% 
-  select(Plot, Trap, Date_collected, All_Leaf) ->
+  select(Plot, Trap, Date_collected, Year, All_Leaf) ->
   litter_C_A_allyears
 
+# Compute the dates we want to complete()
 days_wanted <- seq(from = min(litter_C_A_allyears$Date_collected, na.rm = TRUE), 
                    to = max(litter_C_A_allyears$Date_collected, na.rm = TRUE), 
                    by = "day")
 
+# Estimate daily fluxes for all days of all years
 litter_C_A_allyears %>%
+  # complete the dataset, inserting missing dates
   complete(Plot, Trap, Date_collected = days_wanted) %>%
-  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) %>% 
-  # add a column for year;for each year, compute cumulative flux
-  mutate(Year_Collected = year(Date_collected)) %>% 
-  group_by(Year_Collected) %>% 
+  # interpolate
+  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE),
+         # re-compute this, since we inserted new dates
+         Year = year(Date_collected)) %>% 
+  # compute cumulative flux for each year
+  group_by(Year) %>% 
   mutate(All_Leaf_Cumulative = cumsum(All_Leaf)) ->
   litter_C_A_daily
 
-
-ggplot(litter_C_A_daily, aes(x = Date_collected, y = All_Leaf)) + geom_point() +
+ggplot(litter_C_A_daily, aes(x = Date_collected, y = All_Leaf)) + 
+  geom_point(na.rm = TRUE) +
   ylab("Leaf Litter Flux (g/day)") +
-  xlab("Date")
+  xlab("Date") +
+  geom_vline(xintercept = ymd(paste0(2020:2025, "-01-01")), 
+             color = "blue", linetype = 2)
 
-ggplot(litter_C_A_daily, aes(x = yday(Date_collected), y = All_Leaf_Cumulative, color = Year_Collected)) +
-  geom_point()
+ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
+                             y = All_Leaf_Cumulative, 
+                             color = factor(Year))) +
+  geom_point(na.rm = TRUE) 
 
 ```
 
+**This shows we have a problem.** In some years the first collection isn't
+until well into the year, and as a result the interpolated litterfall
+continues throughout winter (i.e., the first part of the year, even
+though presumably is almost all occurred late in the previous year).
 
+First and last collection dates by year:
 
+```{r first-last-table}
+litter %>% 
+  group_by(Year = year(Date_collected)) %>% 
+  summarise(first = min(Date_collected), 
+            last = max(Date_collected)) %>% 
+  knitr::kable()
+```
+
+## Account for lack of collections right at the year changeover
 
 ```{r}
-# Graph all traps in salt plot interpolated
+PREV_YEAR_FRAC <- 0.95
+```
 
+**Fix for this issue:** for each year, we find the first collection and 
+assume that `r PREV_YEAR_FRAC` of that actually occurred by 12/31 the 
+previous year.
+
+So, we insert 'fake' collections on 12/31 (previous year), as well as a
+fake zero collection on 1/1 of the current year. Finally, adjust the 
+first collection to `r 1-PREV_YEAR_FRAC` of its value.
+
+This is a PITA! But this seems the best way to deal with it reproducibly.
+
+```{r year-changeover}
+
+# Flag the first collections for each year, plot, trap
 litter %>% 
-  filter(Plot == "S") %>% 
-  select(Plot, Trap, Date_collected, All_Leaf) ->
-  litter_S_alltraps
+  arrange(Date_collected) %>% 
+  group_by(Year, Plot, Trap) %>% 
+  mutate(first = c(TRUE, rep(FALSE, n() - 1))) %>% 
+  ungroup() %>% 
+  # we don't do this for 2018 data, the first year
+  mutate(first = if_else(Year == 2018, FALSE, first)) ->
+  litter
 
-litter_S_alltraps %>%
-  # TODO: talk about this
+# Create artificial collections on 12/31 of the previous year
+litter %>% 
+  filter(first) %>% 
+  mutate(Leaf_ACRU = PREV_YEAR_FRAC * Leaf_ACRU,
+         Leaf_FAGR = PREV_YEAR_FRAC * Leaf_FAGR,
+         Leaf_LITU = PREV_YEAR_FRAC * Leaf_LITU,
+         Leaf_Other = PREV_YEAR_FRAC * Leaf_Other,
+         All_Leaf = PREV_YEAR_FRAC * All_Leaf,
+         Date_collected = ymd(paste0(Year - 1, "-12-31")),
+         Year = year(Date_collected)) ->
+  inferred_end_of_year
+
+# Create artificial collections on 1/1 of the current year
+litter %>% 
+  filter(first) %>% 
+  mutate(Leaf_ACRU = 0,
+         Leaf_FAGR = 0,
+         Leaf_LITU = 0,
+         Leaf_Other = 0,
+         All_Leaf = 0,
+         Date_collected = ymd(paste0(Year, "-01-01")),
+         Year = year(Date_collected)) ->
+  inferred_start_of_year
+
+# Adjust the first collections to 5% of their value
+litter %>% 
+  filter(first) %>% 
+  mutate(Leaf_ACRU = (1 - PREV_YEAR_FRAC) * Leaf_ACRU,
+         Leaf_FAGR = (1 - PREV_YEAR_FRAC) * Leaf_FAGR,
+         Leaf_LITU = (1 - PREV_YEAR_FRAC) * Leaf_LITU,
+         Leaf_Other = (1 - PREV_YEAR_FRAC) * Leaf_Other,
+         All_Leaf = (1 - PREV_YEAR_FRAC) * All_Leaf) ->
+  new_firsts
+
+# Combine these together and re-compute things
+litter %>% 
+  filter(!first) %>% 
+  bind_rows(new_firsts, inferred_end_of_year, inferred_start_of_year) %>% 
+  # re-do the elapsed_days calculation
+  arrange(Date_collected) %>%
+  group_by(Plot, Trap) %>% 
+  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
+  ungroup() %>%
+  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
+  litter_adjusted
+
+```
+
+Whew! Re-do the Control A example above:
+
+```{r}
+litter_adjusted %>% 
+  filter(Plot == "C", Trap == "A") %>% 
+  select(Plot, Trap, Date_collected, Year, All_Leaf) ->
+  litter_C_A_allyears
+
+# Compute the dates we want to complete()
+days_wanted <- seq(from = min(litter_C_A_allyears$Date_collected, na.rm = TRUE), 
+                   to = max(litter_C_A_allyears$Date_collected, na.rm = TRUE), 
+                   by = "day")
+
+# Estimate daily fluxes for all days of all years
+litter_C_A_allyears %>%
+  # complete the dataset, inserting missing dates
   complete(Plot, Trap, Date_collected = days_wanted) %>%
-  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) ->
-  litter_S_daily
+  # interpolate
+  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE),
+         # re-compute this, since we inserted new dates
+         Year = year(Date_collected)) %>% 
+  # compute cumulative flux for each year
+  group_by(Year) %>% 
+  mutate(All_Leaf_Cumulative = cumsum(All_Leaf)) ->
+  litter_C_A_daily
 
-ggplot(litter_S_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) +
-  geom_point()
+ggplot(litter_C_A_daily, aes(x = Date_collected, y = All_Leaf)) + 
+  geom_point(na.rm = TRUE) +
+  ylab("Leaf Litter Flux (g/day)") +
+  xlab("Date") +
+  geom_vline(xintercept = ymd(paste0(2020:2025, "-01-01")), 
+             color = "blue", linetype = 2)
+
+ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
+                             y = All_Leaf_Cumulative, 
+                             color = factor(Year))) +
+  geom_point(na.rm = TRUE) 
 
 ```
 
@@ -175,7 +298,7 @@ ggplot(litter_S_daily,aes(x = Date_collected, y = All_Leaf, color = Trap)) +
 
 ## Basic Visualization
 
-```{r basicvis, echo=FALSE}
+```{r basicvis, echo=FALSE, eval=FALSE}
 library(ggplot2)
 
 ## plot biomass
@@ -198,8 +321,7 @@ ggplot(data = litter, aes(Date_collected, All_Leaf_perday, color = Plot)) + geom
 
 ## Species average over time
 
-```{r}
-library(tidyr)
+```{r, eval=FALSE}
 litter %>%
   group_by(Plot, Date_collected) %>%
   summarise(Leaf_ACRU = mean(Leaf_ACRU, na.rm = TRUE), 
