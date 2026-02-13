@@ -197,9 +197,9 @@ This is a PITA! But this seems the best way to deal with it reproducibly.
 
 # Flag the first collections for each year, plot, trap
 litter %>% 
-  arrange(Date_collected) %>% 
   group_by(Year, Plot, Trap) %>% 
-  mutate(first = c(TRUE, rep(FALSE, n() - 1))) %>% 
+  # compare date collected with min date collected and assign it to "first"
+  mutate(first = Date_collected == min(Date_collected)) %>% 
   ungroup() %>% 
   # we don't do this for 2018 data, the first year
   mutate(first = if_else(Year == 2018, FALSE, first)) ->
@@ -225,8 +225,7 @@ litter %>%
          Leaf_LITU = 0,
          Leaf_Other = 0,
          All_Leaf = 0,
-         Date_collected = ymd(paste0(Year, "-01-01")),
-         Year = year(Date_collected)) ->
+         Date_collected = ymd(paste0(Year, "-01-01"))) ->
   inferred_start_of_year
 
 # Adjust the first collections to 5% of their value
@@ -241,7 +240,10 @@ litter %>%
 
 # Combine these together and re-compute things
 litter %>% 
+  # get rid of original first numbers/data "!" b/c we've recalculated these
   filter(!first) %>% 
+  # add rows; take litter dataset, drop away first data collection and add on 
+    # new data calculations, 12/31, & 1/1 dates
   bind_rows(new_firsts, inferred_end_of_year, inferred_start_of_year) %>% 
   # re-do the elapsed_days calculation
   arrange(Date_collected) %>%
@@ -291,6 +293,11 @@ ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
                              color = factor(Year))) +
   geom_point(na.rm = TRUE) 
 
+```
+```{r}
+## Next steps:
+# 1. extend litter control A example to plot total litter biomass by year; take litter adjust and compute total flux for each year
+# 2. plot
 ```
 
 
