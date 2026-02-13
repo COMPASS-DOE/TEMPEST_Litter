@@ -297,7 +297,67 @@ ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
 ```{r}
 ## Next steps:
 # 1. extend litter control A example to plot total litter biomass by year; take litter adjust and compute total flux for each year
+
+
+litter_adjusted %>%
+  arrange(Date_collected) %>%
+  group_by(Plot, Trap) %>% 
+  # compute the difference between collection dates. For a series of
+  # size n, diff() returns n-1 intervals, so we add one NA at the front
+  # because the first date has no elapsed time (since no previous date)
+  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
+  ungroup() %>%
+  arrange(Plot, Trap, Date_collected) %>% 
+  ## finally compute flux: litter per day
+  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
+  litter_adjusted
+
+litter_adjusted %>%
+  arrange(Date_collected) %>%
+  group_by(Plot, Trap) %>% 
+  # compute the difference between collection dates. For a series of
+  # size n, diff() returns n-1 intervals, so we add one NA at the front
+  # because the first date has no elapsed time (since no previous date)
+  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
+  ungroup() %>%
+  arrange(Plot, Trap, Date_collected) %>% 
+  ## finally compute flux: litter per day
+  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
+  litter_adjusted
+
+litter_adjusted %>% 
+  filter(Plot == "C", Trap == "A") %>% 
+  select(Plot, Trap, Date_collected, All_Leaf) ->
+  litter_C_A_adjusted
+
+days_wanted_adj <- seq(from = min(litter_C_A_adjusted$Date_collected), 
+                   to = max(litter_C_A_adjusted$Date_collected), 
+                   by = "day")
+
+litter_C_A_adjusted %>%
+  complete(Plot, Trap, Date_collected = days_wanted_adj) %>%
+  mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) ->
+  litter_C_A_adj_allyrs
+
+
 # 2. plot
+
+ggplot(litter_C_A_adj_allyrs, aes(x = Date_collected, y = All_Leaf)) +
+  geom_point()
+
+
+# annual flux by plot and trap
+litter_C_A_adj_allyrs %>%
+  mutate(Year = year(Date_collected)) %>%
+# group by plot, trap, year
+  group_by(Plot, Trap, Year) %>%
+# sum up the daily fluxes to an annual values
+  summarise(All_Leaf_peryear = sum(All_Leaf), .groups = "drop") %>%
+# plot
+  ggplot(aes(Year, All_Leaf_peryear, color = Plot)) + geom_point() + geom_line()
+
+
+
 ```
 
 
