@@ -294,23 +294,13 @@ ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
   geom_point(na.rm = TRUE) 
 
 ```
+
+## Full dataset over time
+
 ```{r}
 ## Next steps:
-# 1. extend litter control A example to plot total litter biomass by year; take litter adjust and compute total flux for each year
-
-
-litter_adjusted %>%
-  arrange(Date_collected) %>%
-  group_by(Plot, Trap) %>% 
-  # compute the difference between collection dates. For a series of
-  # size n, diff() returns n-1 intervals, so we add one NA at the front
-  # because the first date has no elapsed time (since no previous date)
-  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
-  ungroup() %>%
-  arrange(Plot, Trap, Date_collected) %>% 
-  ## finally compute flux: litter per day
-  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
-  litter_adjusted
+# 1. extend litter control A example to plot total litter biomass by year; 
+# take litter adjust and compute total flux for each year
 
 litter_adjusted %>%
   arrange(Date_collected) %>%
@@ -323,84 +313,42 @@ litter_adjusted %>%
   arrange(Plot, Trap, Date_collected) %>% 
   ## finally compute flux: litter per day
   mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
-  litter_adjusted
+  litter_adj_perday
 
-litter_adjusted %>% 
-  filter(Plot == "C", Trap == "A") %>% 
-  select(Plot, Trap, Date_collected, All_Leaf) ->
-  litter_C_A_adjusted
-
-days_wanted_adj <- seq(from = min(litter_C_A_adjusted$Date_collected), 
-                   to = max(litter_C_A_adjusted$Date_collected), 
+days_wanted_adj <- seq(from = min(litter_adj_perday$Date_collected), 
+                   to = max(litter_adj_perday$Date_collected), 
                    by = "day")
 
-litter_C_A_adjusted %>%
+litter_adj_perday %>%
   complete(Plot, Trap, Date_collected = days_wanted_adj) %>%
   mutate(All_Leaf = na.approx(All_Leaf, na.rm = FALSE)) ->
-  litter_C_A_adj_allyrs
+  litter_adj_perday_complete
 
+# ALICE: I have simplified things above and changed it so we're not
+# filtering for control A anymore; we want to process and visualize
+# ALL the data.
 
 # 2. plot
 
-ggplot(litter_C_A_adj_allyrs, aes(x = Date_collected, y = All_Leaf)) +
-  geom_point()
+# ggplot(litter_C_A_adj_allyrs, aes(x = Date_collected, y = All_Leaf)) +
+#   geom_point()
 
 
-# annual flux by plot and trap
-litter_C_A_adj_allyrs %>%
+# Annual flux by plot and trap
+litter_adj_perday_complete %>%
   mutate(Year = year(Date_collected)) %>%
 # group by plot, trap, year
   group_by(Plot, Trap, Year) %>%
 # sum up the daily fluxes to an annual values
-  summarise(All_Leaf_peryear = sum(All_Leaf), .groups = "drop") %>%
+  summarise(All_Leaf_peryear = sum(All_Leaf), .groups = "drop") ->
+  litter_annual_fluxes
+
+# ALICE: 
+# 1. Look at the resulting dataset computed above. Do the columns and rows make sense?
+# 2. How should we plot this?
+
 # plot
-  ggplot(aes(Year, All_Leaf_peryear, color = Plot)) + geom_point() + geom_line()
-
-
+# ggplot(aes(Year, All_Leaf_peryear, color = Plot)) + geom_point() + geom_line()
 
 ```
-
-
-## Step 4: We want to compute cumulative litter fall across the year
-
-## Basic Visualization
-
-```{r basicvis, echo=FALSE, eval=FALSE}
-library(ggplot2)
-
-## plot biomass
-
-ggplot(data = litter, aes(Date_collected, Leaf_LITU, color = Plot)) + geom_point(na.rm = TRUE)
-
-ggplot(data = litter, aes(Date_collected, Leaf_ACRU, color = Plot)) + geom_point(na.rm = TRUE)
-
-ggplot(data = litter, aes(Date_collected, Leaf_FAGR, color = Plot)) + geom_point(na.rm = TRUE)
-
-ggplot(data = litter, aes(Date_collected, Leaf_Other, color = Plot)) + geom_point(na.rm = TRUE)
-
-ggplot(data = litter, aes(Date_collected, All_Leaf, color = Plot)) + geom_point(na.rm = TRUE)
-
-##  plot flux
-
-ggplot(data = litter, aes(Date_collected, All_Leaf_perday, color = Plot)) + geom_point(na.rm = TRUE)
-
-```
-
-## Species average over time
-
-```{r, eval=FALSE}
-litter %>%
-  group_by(Plot, Date_collected) %>%
-  summarise(Leaf_ACRU = mean(Leaf_ACRU, na.rm = TRUE), 
-            Leaf_FAGR = mean(Leaf_FAGR, na.rm = TRUE),
-            Leaf_LITU = mean(Leaf_LITU, na.rm = TRUE),
-            Leaf_Other = mean(Leaf_Other, na.rm = TRUE), .groups = "drop") %>%
-  pivot_longer(starts_with("Leaf_")) ->
-  litter_smry
-
-ggplot(litter_smry, aes(Date_collected, value, color = Plot)) + geom_line() + facet_grid(name ~ .)
-
-```
-
-## 
 
