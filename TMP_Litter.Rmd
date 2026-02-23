@@ -368,35 +368,3 @@ ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, g
 
 ```
 
-```{r}
-##LITU's
-litter_adjusted %>%
-  arrange(Date_collected) %>%
-  group_by(Plot, Trap) %>% 
-  # compute the difference between collection dates. For a series of
-  # size n, diff() returns n-1 intervals, so we add one NA at the front
-  # because the first date has no elapsed time (since no previous date)
-  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
-  ungroup() %>%
-  arrange(Plot, Trap, Date_collected) %>% 
-  ## finally compute flux: litter per day
-  mutate(Leaf_LITU_perday = Leaf_LITU / elapsed_days) ->
-  litter_adj_LITU_perday
-
-
-# generating the sequence of dates from min day collected to max
-days_wanted_adj <- seq(from = min(litter_adj_LITU_perday$Date_collected), 
-                   to = max(litter_adj_LITU_perday$Date_collected), 
-                   by = "day")
-
-litter_adj_LITU_perday %>%
-  complete(Plot, Trap, Date_collected = days_wanted_adj) %>%
-  mutate(LITU_perday = na.approx(Leaf_LITU_perday, na.rm = FALSE)) ->
-  litter_adj_LITU_perday_complete
-
-ggplot(litter_adj_LITU_perday_complete, aes(x = Date_collected, y = Leaf_LITU_perday, color = Plot)) +
-  geom_point() +
-  scale_color_manual(values = c("green", "blue", "red")) +
-  facet_grid(Plot ~ .)
-```
-
