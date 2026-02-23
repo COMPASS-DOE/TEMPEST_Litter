@@ -15,11 +15,13 @@ library(ggplot2)
 library(tidyr)
 library(zoo)
 theme_set(theme_bw())
+library(terra)
 ```
 
 ## Read in Data
 
 ```{r read-data}
+message("Reading litter data...")
 litter <- read_csv("TEMPEST litter data - Masses.csv", 
                    skip = 1, show_col_types = FALSE) 
 ## Convert date collected column into an actual date format,
@@ -32,7 +34,26 @@ litter %>%
          Leaf_ACRU, Leaf_FAGR, Leaf_LITU, Leaf_Other, All_Leaf) ->
   litter
 
-message("data read ok! rows = ", nrow(litter))
+message("\tdata read ok! rows = ", nrow(litter))
+
+message("Reading climate data...")
+clim <- rast("ERA5_data/8b6cbe648672d22c1a733be76b08f899.grib")
+climdat_era <- terra::extract(clim, data.frame(lon = -76.551, lat = 38.875))
+
+climdat_era %>% 
+  pivot_longer(-ID) %>% 
+  mutate(time = terra::time(clim),
+         Year = year(time)) %>% 
+  group_by(Year, name) %>% 
+  summarise(value = mean(value), .groups = "drop") %>% 
+  pivot_wider(names_from = "name") ->
+  climdat
+
+names(climdat) <- c("Year", "Tair2m_C", "Srad_Ws_m2", "Precip_cm")
+# Convert precipitation from average m to total cm
+climdat$Precip_cm <- climdat$Precip_cm * 365 * 100
+# Convert Tair from K to degC
+climdat$Tair2m_C <- climdat$Tair2m_C - 273.1
 ```
 
 ## Calculate/fill in All-Leaf column
@@ -347,14 +368,7 @@ litter_adj_perday_complete %>%
 
 # boxplot
 ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, group = paste(Year, Plot))) +
-  geom_boxplot()
-
-# ALICE: 
-# 1. Look at the resulting dataset computed above. Do the columns and rows make sense?
-# 2. How should we plot this?
-
-# plot
-# ggplot(aes(Year, All_Leaf_peryear, color = Plot)) + geom_point() + geom_line()
+  geom_boxplot(na.rm = TRUE)
 
 
 # play around with different visualizations
@@ -363,10 +377,12 @@ ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, g
 
 ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, group = paste(Year, Plot))) +
   scale_color_manual(values = c("green", "blue", "red")) +
-  geom_boxplot()
+  geom_boxplot(na.rm = TRUE)
 
 
 ```
+
+
 
 ```{r}
 ##LITU's
@@ -395,7 +411,7 @@ litter_adj_LITU_perday %>%
   litter_adj_LITU_perday_complete
 
 ggplot(litter_adj_LITU_perday_complete, aes(x = Date_collected, y = Leaf_LITU_perday, color = Plot)) +
-  geom_point() +
+  geom_point(na.rm = TRUE) +
   scale_color_manual(values = c("green", "blue", "red")) +
   facet_grid(Plot ~ .)
 ```

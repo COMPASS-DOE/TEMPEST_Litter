@@ -5,3 +5,6 @@
 
 *.html
 .Rhistory
+
+# OS files
+.DS_Store
