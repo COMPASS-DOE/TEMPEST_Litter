@@ -1,29 +1,41 @@
 ---
 title: "Alice's TEMPEST litter analysis"
 author: "AES"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "23 February, 2026"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 
-library(readr)
-library(lubridate)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-library(zoo)
-theme_set(theme_bw())
-library(terra)
-```
 
 ## Read in Data
 
-```{r read-data}
+
+``` r
 message("Reading litter data...")
+```
+
+```
+## Reading litter data...
+```
+
+``` r
 litter <- read_csv("TEMPEST litter data - Masses.csv", 
                    skip = 1, show_col_types = FALSE) 
+```
+
+```
+## New names:
+## • `` -> `...17`
+```
+
+```
+## Warning: One or more parsing issues, call `problems()` on your data frame for details,
+## e.g.:
+##   dat <- vroom(...)
+##   problems(dat)
+```
+
+``` r
 ## Convert date collected column into an actual date format,
 ## and isolate columns we care about
 litter %>%
@@ -35,11 +47,30 @@ litter %>%
   litter
 
 message("\tdata read ok! rows = ", nrow(litter))
+```
 
+```
+## 	data read ok! rows = 1980
+```
+
+``` r
 message("Reading climate data...")
+```
+
+```
+## Reading climate data...
+```
+
+``` r
 clim <- rast("ERA5_data/8b6cbe648672d22c1a733be76b08f899.grib")
 climdat_era <- terra::extract(clim, data.frame(lon = -76.551, lat = 38.875))
+```
 
+```
+## Warning: [extract] transforming vector data to the CRS of the raster
+```
+
+``` r
 climdat_era %>% 
   pivot_longer(-ID) %>% 
   mutate(time = terra::time(clim),
@@ -58,14 +89,14 @@ climdat$Tair2m_C <- climdat$Tair2m_C - 273.1
 
 ## Calculate/fill in All-Leaf column
 
-```{r fill all leaf}
+
+``` r
 ## if else means; condition is na is all leaf; if true add species and put in all leaf; if false use what is in all leaf
 litter %>% 
   mutate(All_Leaf = if_else(condition = is.na(All_Leaf),
                             true = Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
                             false = All_Leaf)) ->
   litter
-
 ```
 
 ## Turn these collection masses into daily fluxes
@@ -73,7 +104,8 @@ litter %>%
 * Step 1: Calculate how long it's been since the last collection
 * Step 2: Divide leaf litter biomass by the time computed in Step 1
 
-```{r calc-daily-fluxes}
+
+``` r
 # for each plot and trap we want to compute the days
 
 litter %>%
@@ -88,15 +120,14 @@ litter %>%
   ## finally compute flux: litter per day
   mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
   litter
-
 ```
 
 ## Step 3: Interpolate rates between collection dates
 
 ### Control A 2019 example
 
-```{r control-a-2019-example}
 
+``` r
 ## to interpolate between two dates, we need to create empty rows
 ## for example, if we collected on 10/1 and 10/10 right now we only have those rows in our data set
 ## so we need to create rows from 10/2 . . . 10/9 and then interpolate between the 10/1 flux and 10/10 flux to fill in those rows
@@ -109,7 +140,27 @@ test <- tibble(day = mdy(c("10/20/2021", "10/31/2021")),
 test %>% 
   complete(day = seq(min(day), max(day), by = "day")) %>% 
   mutate(values = na.approx(values))
+```
 
+```
+## # A tibble: 12 × 2
+##    day        values
+##    <date>      <dbl>
+##  1 2021-10-20   60  
+##  2 2021-10-21   63.4
+##  3 2021-10-22   66.7
+##  4 2021-10-23   70.1
+##  5 2021-10-24   73.5
+##  6 2021-10-25   76.8
+##  7 2021-10-26   80.2
+##  8 2021-10-27   83.5
+##  9 2021-10-28   86.9
+## 10 2021-10-29   90.3
+## 11 2021-10-30   93.6
+## 12 2021-10-31   97
+```
+
+``` r
 # Examine: just the control 'A' trap in 2019
 litter %>% 
   filter(Plot == "C", Trap == "A", year(Date_collected) == 2019) %>% 
@@ -138,12 +189,14 @@ litter_C_A_example %>%
 
 ggplot(litter_C_A_2019, aes(x = Date_collected, y = All_Leaf)) +
   geom_point()
-
 ```
+
+<img src="TMP_Litter_files/figure-html/control-a-2019-example-1.png" width="672" />
 
 ### Control trap A over all years
 
-```{r control-A-example}
+
+``` r
 ## Control trap A over all years
 
 litter %>% 
@@ -175,13 +228,18 @@ ggplot(litter_C_A_daily, aes(x = Date_collected, y = All_Leaf)) +
   xlab("Date") +
   geom_vline(xintercept = ymd(paste0(2020:2025, "-01-01")), 
              color = "blue", linetype = 2)
+```
 
+<img src="TMP_Litter_files/figure-html/control-A-example-1.png" width="672" />
+
+``` r
 ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
                              y = All_Leaf_Cumulative, 
                              color = factor(Year))) +
   geom_point(na.rm = TRUE) 
-
 ```
+
+<img src="TMP_Litter_files/figure-html/control-A-example-2.png" width="672" />
 
 **This shows we have a problem.** In some years the first collection isn't
 until well into the year, and as a result the interpolated litterfall
@@ -190,7 +248,8 @@ though presumably is almost all occurred late in the previous year).
 
 First and last collection dates by year:
 
-```{r first-last-table}
+
+``` r
 litter %>% 
   group_by(Year = year(Date_collected)) %>% 
   summarise(first = min(Date_collected), 
@@ -198,24 +257,39 @@ litter %>%
   knitr::kable()
 ```
 
+
+
+| Year|first      |last       |
+|----:|:----------|:----------|
+| 2018|2018-11-08 |2018-12-19 |
+| 2019|2019-04-16 |2019-12-20 |
+| 2020|2020-06-19 |2020-12-30 |
+| 2021|2021-03-09 |2021-12-10 |
+| 2022|2022-01-25 |2022-10-28 |
+| 2023|2023-01-27 |2023-12-14 |
+| 2024|2024-09-06 |2024-12-03 |
+| 2025|2025-04-25 |2025-11-18 |
+| 2026|2026-01-06 |2026-01-06 |
+
 ## Account for lack of collections right at the year changeover
 
-```{r}
+
+``` r
 PREV_YEAR_FRAC <- 0.95
 ```
 
 **Fix for this issue:** for each year, we find the first collection and 
-assume that `r PREV_YEAR_FRAC` of that actually occurred by 12/31 the 
+assume that 0.95 of that actually occurred by 12/31 the 
 previous year.
 
 So, we insert 'fake' collections on 12/31 (previous year), as well as a
 fake zero collection on 1/1 of the current year. Finally, adjust the 
-first collection to `r 1-PREV_YEAR_FRAC` of its value.
+first collection to 0.05 of its value.
 
 This is a PITA! But this seems the best way to deal with it reproducibly.
 
-```{r year-changeover}
 
+``` r
 # Flag the first collections for each year, plot, trap
 litter %>% 
   group_by(Year, Plot, Trap) %>% 
@@ -273,12 +347,12 @@ litter %>%
   ungroup() %>%
   mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
   litter_adjusted
-
 ```
 
 Whew! Re-do the Control A example above:
 
-```{r}
+
+``` r
 litter_adjusted %>% 
   filter(Plot == "C", Trap == "A") %>% 
   select(Plot, Trap, Date_collected, Year, All_Leaf) ->
@@ -308,17 +382,23 @@ ggplot(litter_C_A_daily, aes(x = Date_collected, y = All_Leaf)) +
   xlab("Date") +
   geom_vline(xintercept = ymd(paste0(2020:2025, "-01-01")), 
              color = "blue", linetype = 2)
+```
 
+<img src="TMP_Litter_files/figure-html/unnamed-chunk-2-1.png" width="672" />
+
+``` r
 ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
                              y = All_Leaf_Cumulative, 
                              color = factor(Year))) +
   geom_point(na.rm = TRUE) 
-
 ```
+
+<img src="TMP_Litter_files/figure-html/unnamed-chunk-2-2.png" width="672" />
 
 ## Full dataset over time
 
-```{r}
+
+``` r
 ## Next steps:
 # 1. extend litter control A example to plot total litter biomass by year; 
 # take litter adjust and compute total flux for each year
@@ -355,8 +435,16 @@ litter_adj_perday %>%
 ggplot(litter_adj_perday_complete, aes(x = Date_collected, y = All_Leaf_perday, color = Plot)) +
   geom_point() +
   facet_grid(Plot ~ .)
+```
 
+```
+## Warning: Removed 2629 rows containing missing values or values outside the scale range
+## (`geom_point()`).
+```
 
+<img src="TMP_Litter_files/figure-html/unnamed-chunk-3-1.png" width="672" />
+
+``` r
 # Annual flux by plot and trap
 litter_adj_perday_complete %>%
   mutate(Year = year(Date_collected)) %>%
@@ -369,55 +457,56 @@ litter_adj_perday_complete %>%
 # boxplot
 ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, group = paste(Year, Plot))) +
   geom_boxplot(na.rm = TRUE)
+```
 
+<img src="TMP_Litter_files/figure-html/unnamed-chunk-3-2.png" width="672" />
 
+``` r
 # play around with different visualizations
+
+# histogram
 
 ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, group = paste(Year, Plot))) +
   scale_color_manual(values = c("green", "blue", "red")) +
   geom_boxplot(na.rm = TRUE)
-
-
 ```
 
-```{r}
-# sum all leaf by plot and year
+<img src="TMP_Litter_files/figure-html/unnamed-chunk-3-3.png" width="672" />
 
+
+
+
+``` r
+##LITU's
 litter_adjusted %>%
-  mutate(Year = year(Date_collected)) %>%
-# group by plot, trap, year
-  group_by(Plot, Trap, Year) %>%
-# sum up all leaf per year
-  summarise(All_Leaf_peryear = sum(All_Leaf_perday), .groups = "drop") ->
-  litter_annual_sum
-```
+  arrange(Date_collected) %>%
+  group_by(Plot, Trap) %>% 
+  # compute the difference between collection dates. For a series of
+  # size n, diff() returns n-1 intervals, so we add one NA at the front
+  # because the first date has no elapsed time (since no previous date)
+  mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
+  ungroup() %>%
+  arrange(Plot, Trap, Date_collected) %>% 
+  ## finally compute flux: litter per day
+  mutate(Leaf_LITU_perday = Leaf_LITU / elapsed_days) ->
+  litter_adj_LITU_perday
 
-```{r}
-# Join data sets
-litter_precip_year <- left_join(litter_annual_sum, climdat, by = "Year")
 
-# plot annual litter sum with annual precip
-coeff <- 10
+# generating the sequence of dates from min day collected to max
+days_wanted_adj <- seq(from = min(litter_adj_LITU_perday$Date_collected), 
+                   to = max(litter_adj_LITU_perday$Date_collected), 
+                   by = "day")
 
-ggplot(litter_precip_year, aes(x = Year)) +
-  # Primary variable (Litter)
-  geom_line(aes(y = All_Leaf_peryear, color = Plot), size = 1) +
-  # Secondary variable (Precipitation) - rescaled to match Litter scale
-  geom_line(aes(y = Precip_cm / coeff), size = 1) +
-  # Create the second axis
-  scale_y_continuous(
-    name = "Litter per year (g)",
-    sec.axis = sec_axis(~.*coeff, name = "Precipitation (mm)")) +
-  labs(title = "Litter and Precipitation Over Time", x = "Year", color = "Variable") +
+litter_adj_LITU_perday %>%
+  complete(Plot, Trap, Date_collected = days_wanted_adj) %>%
+  mutate(LITU_perday = na.approx(Leaf_LITU_perday, na.rm = FALSE)) ->
+  litter_adj_LITU_perday_complete
+
+ggplot(litter_adj_LITU_perday_complete, aes(x = Date_collected, y = Leaf_LITU_perday, color = Plot)) +
+  geom_point(na.rm = TRUE) +
   scale_color_manual(values = c("green", "blue", "red")) +
   facet_grid(Plot ~ .)
-
-
-
 ```
- 
-```{r}
 
-```
- 
+<img src="TMP_Litter_files/figure-html/unnamed-chunk-4-1.png" width="672" />
 
