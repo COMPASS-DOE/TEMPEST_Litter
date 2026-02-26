@@ -380,37 +380,31 @@ ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, g
 
 ```
 
+
+
 ```{r}
 # sum all leaf by plot and year
 
-litter_adjusted %>%
-  mutate(Year = year(Date_collected)) %>%
-# group by plot, trap, year
-  group_by(Plot, Trap, Year) %>%
-# sum up all leaf per year
-  summarise(All_Leaf_peryear = sum(All_Leaf_perday), .groups = "drop") ->
-  litter_annual_sum
+litter_annual_perplot <- litter_annual_fluxes %>%
+  group_by(Plot, Year) %>%
+  summarise(All_Leaf_perplot = sum(All_Leaf_peryear, na.rm = TRUE),
+            .groups = "drop")
+
 ```
 
 ```{r}
 # Join data sets
-litter_precip_year <- left_join(litter_annual_sum, climdat, by = "Year")
+litter_precip_year <- left_join(litter_annual_perplot, climdat, by = "Year")
 
-# plot annual litter sum with annual precip
-coeff <- 10
-
-ggplot(litter_precip_year, aes(x = Year)) +
-  # Primary variable (Litter)
-  geom_line(aes(y = All_Leaf_peryear, color = Plot), size = 1) +
-  # Secondary variable (Precipitation) - rescaled to match Litter scale
-  geom_line(aes(y = Precip_cm / coeff), size = 1) +
-  # Create the second axis
-  scale_y_continuous(
-    name = "Litter per year (g)",
-    sec.axis = sec_axis(~.*coeff, name = "Precipitation (mm)")) +
-  labs(title = "Litter and Precipitation Over Time", x = "Year", color = "Variable") +
-  scale_color_manual(values = c("green", "blue", "red")) +
-  facet_grid(Plot ~ .)
+ggplot(litter_precip_year, aes(x = Precip_cm, y = All_Leaf_perplot, color = Plot)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    x = "Precipitation",
+    y = "Litter",
+    color = "Plot"
+  ) +
+  theme_minimal()
 
 
 
