@@ -38,6 +38,7 @@ message("\tdata read ok! rows = ", nrow(litter))
 
 message("Reading climate data...")
 clim <- rast("ERA5_data/8b6cbe648672d22c1a733be76b08f899.grib")
+# extracting climate data for serc lat long
 climdat_era <- terra::extract(clim, data.frame(lon = -76.551, lat = 38.875))
 
 climdat_era %>% 
@@ -387,23 +388,29 @@ ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, g
 ```{r}
 # sum all leaf by plot and year
 
-litter_annual_perplot <- litter_annual_fluxes %>%
+litter_ann_perplot_m2 <- litter_annual_fluxes %>%
+  # 2018 was our first year and our data was incomplete
+  filter(Year > 2018) %>% 
   group_by(Plot, Year) %>%
-  summarise(All_Leaf_perplot = sum(All_Leaf_peryear, na.rm = TRUE),
+  # TEMPEST litter traps are 0.5 m2
+  # so we divide each trap mass by 0.5 m2 to get grams per m2
+  #average flux across traps
+  summarise(All_Leaf_perplot = mean (All_Leaf_peryear / 0.5, na.rm = TRUE),
             .groups = "drop")
+
 
 ```
 
 ```{r}
 # Join data sets
-litter_precip_year <- left_join(litter_annual_perplot, climdat, by = "Year")
+litter_precip_year <- left_join(litter_ann_perplot_m2, climdat, by = "Year")
 
 ggplot(litter_precip_year, aes(x = Precip_cm, y = All_Leaf_perplot, color = Plot)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE) +
   labs(
-    x = "Precipitation",
-    y = "Litter",
+    x = "Precipitation (cm/year)",
+    y = "Leaf Litter (g/m2/year)",
     color = "Plot"
   ) +
   theme_minimal()
