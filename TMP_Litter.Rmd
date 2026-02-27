@@ -50,7 +50,9 @@ climdat_era %>%
   climdat
 
 names(climdat) <- c("Year", "Tair2m_C", "Srad_Ws_m2", "Precip_cm")
-# Convert precipitation from average m to total cm
+
+# Convert precipitation from average m/day to total cm/yr
+# See https://confluence.ecmwf.int/display/CKB/ERA5-Land%3A+data+documentation#ERA5Land:datadocumentation-accumulationsAccumulations
 climdat$Precip_cm <- climdat$Precip_cm * 365 * 100
 # Convert Tair from K to degC
 climdat$Tair2m_C <- climdat$Tair2m_C - 273.1
