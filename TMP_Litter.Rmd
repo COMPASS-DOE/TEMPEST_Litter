@@ -29,7 +29,11 @@ litter <- read_csv("TEMPEST litter data - Masses.csv",
 litter %>%
   filter(!is.na(Date_collected)) %>% 
   mutate(Date_collected = mdy(Date_collected),
-         Year = year(Date_collected)) %>% 
+## TEMPEST traps are 0.5 m2
+## so calculate g/m2 for all mass
+         Year = year(Date_collected),
+         Leaf_ACRU / 0.5, Leaf_LITU / 0.5, Leaf_FAGR / 0.5, 
+         Leaf_Other / 0.5, All_Leaf / 0.5) %>% 
   select(Plot, Trap, Date_collected, Year, 
          Leaf_ACRU, Leaf_FAGR, Leaf_LITU, Leaf_Other, All_Leaf) ->
   litter
