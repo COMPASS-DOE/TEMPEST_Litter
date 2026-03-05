@@ -418,6 +418,7 @@ ggplot(litter_precip_year, aes(x = Precip_cm, y = All_Leaf_perplot, color = Plot
     y = "Leaf Litter (g/m2/year)",
     color = "Plot"
   ) +
+   scale_color_manual(values = c("green", "blue", "red")) +
   theme_minimal()
 
 
@@ -425,6 +426,20 @@ ggplot(litter_precip_year, aes(x = Precip_cm, y = All_Leaf_perplot, color = Plot
 ```
  
 ```{r}
+# PAR
+
+litter_par_year <- left_join(litter_ann_perplot_m2, climdat, by = "Year")
+
+ggplot(litter_par_year, aes(x = Srad_Ws_m2, y = All_Leaf_perplot, color = Plot)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    x = "PAR (?)",
+    y = "Leaf Litter (g/m2/year)",
+    color = "Plot"
+  ) +
+   scale_color_manual(values = c("green", "blue", "red")) +
+  theme_minimal()
 
 ```
  
