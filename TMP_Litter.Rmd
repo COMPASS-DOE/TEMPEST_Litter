@@ -24,16 +24,20 @@ library(terra)
 message("Reading litter data...")
 litter <- read_csv("TEMPEST litter data - Masses.csv", 
                    skip = 1, show_col_types = FALSE) 
-## Convert date collected column into an actual date format,
-## and isolate columns we care about
 litter %>%
+  ## drop rows with no date collected information
   filter(!is.na(Date_collected)) %>% 
+  ## convert date collected column into an actual date format
   mutate(Date_collected = mdy(Date_collected),
-## TEMPEST traps are 0.5 m2
-## so calculate g/m2 for all mass
          Year = year(Date_collected),
-         Leaf_ACRU / 0.5, Leaf_LITU / 0.5, Leaf_FAGR / 0.5, 
-         Leaf_Other / 0.5, All_Leaf / 0.5) %>% 
+         ## TEMPEST traps are 0.5 m2 (71 cm x 71 cm)
+         ## so calculate g/m2 for all masses
+         Leaf_ACRU = Leaf_ACRU / 0.5, 
+         Leaf_LITU = Leaf_LITU / 0.5, 
+         Leaf_FAGR = Leaf_FAGR / 0.5, 
+         Leaf_Other = Leaf_Other / 0.5, 
+         All_Leaf = All_Leaf / 0.5) %>% 
+  ## finally, isolate columns we care about
   select(Plot, Trap, Date_collected, Year, 
          Leaf_ACRU, Leaf_FAGR, Leaf_LITU, Leaf_Other, All_Leaf) ->
   litter
@@ -396,10 +400,7 @@ litter_ann_perplot_m2 <- litter_annual_fluxes %>%
   # 2018 was our first year and our data was incomplete
   filter(Year > 2018) %>% 
   group_by(Plot, Year) %>%
-  # TEMPEST litter traps are 0.5 m2
-  # so we divide each trap mass by 0.5 m2 to get grams per m2
-  #average flux across traps
-  summarise(All_Leaf_perplot = mean (All_Leaf_peryear / 0.5, na.rm = TRUE),
+  summarise(All_Leaf_perplot = mean (All_Leaf_peryear, na.rm = TRUE),
             .groups = "drop")
 
 
