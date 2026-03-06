@@ -20,6 +20,28 @@ library(terra)
 
 ## Read in Data
 
+```{r, eval=FALSE}
+
+# If we have a simple computation:
+x <- tibble(group = c("plot1","plot1","plot2","plot2"), a = 3:6)
+x %>% group_by(group) %>% summarise(mean_a = mean(a))
+
+# and want to add an extra column, sure, easy:
+x %>% group_by(group) %>% summarise(mean_a = mean(a), mean_b = mean(b))
+
+# but what about if the computation is big/complex and/or lots of columns?
+# that would be bad
+# instead, *reshape* our data:
+
+library(tidyr)
+x %>% pivot_longer(-group)
+
+# and NOW we can use group_by!
+x %>% pivot_longer(-group) %>% group_by(group, name) %>% summarise(mean_value = mean(value))
+
+```
+
+
 ```{r read-data}
 message("Reading litter data...")
 litter <- read_csv("TEMPEST litter data - Masses.csv", 
@@ -27,19 +49,21 @@ litter <- read_csv("TEMPEST litter data - Masses.csv",
 litter %>%
   ## drop rows with no date collected information
   filter(!is.na(Date_collected)) %>% 
+  # select the columns we care about, renaming one as we go
+  select(Plot, Trap, Date_collected, 
+         Leaf_ACRU, Leaf_FAGR, Leaf_LITU, Leaf_Other, Leaf_All = All_Leaf) %>%
+  # fill in All_Leaf if empty
+  mutate(Leaf_All = if_else(condition = is.na(Leaf_All),
+                            true = Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
+                            false = Leaf_All)) %>%
+  # reshape the data into 'long' form
+  pivot_longer(starts_with("Leaf_"), names_to = "species") %>%
   ## convert date collected column into an actual date format
   mutate(Date_collected = mdy(Date_collected),
          Year = year(Date_collected),
          ## TEMPEST traps are 0.5 m2 (71 cm x 71 cm)
          ## so calculate g/m2 for all masses
-         Leaf_ACRU = Leaf_ACRU / 0.5, 
-         Leaf_LITU = Leaf_LITU / 0.5, 
-         Leaf_FAGR = Leaf_FAGR / 0.5, 
-         Leaf_Other = Leaf_Other / 0.5, 
-         All_Leaf = All_Leaf / 0.5) %>% 
-  ## finally, isolate columns we care about
-  select(Plot, Trap, Date_collected, Year, 
-         Leaf_ACRU, Leaf_FAGR, Leaf_LITU, Leaf_Other, All_Leaf) ->
+         value = value / 0.5) ->
   litter
 
 message("\tdata read ok! rows = ", nrow(litter))
@@ -67,18 +91,6 @@ climdat$Precip_cm <- climdat$Precip_cm * 365 * 100
 climdat$Tair2m_C <- climdat$Tair2m_C - 273.1
 ```
 
-## Calculate/fill in All-Leaf column
-
-```{r fill all leaf}
-## if else means; condition is na is all leaf; if true add species and put in all leaf; if false use what is in all leaf
-litter %>% 
-  mutate(All_Leaf = if_else(condition = is.na(All_Leaf),
-                            true = Leaf_ACRU + Leaf_FAGR + Leaf_LITU + Leaf_Other,
-                            false = All_Leaf)) ->
-  litter
-
-```
-
 ## Turn these collection masses into daily fluxes
 
 * Step 1: Calculate how long it's been since the last collection
@@ -89,15 +101,15 @@ litter %>%
 
 litter %>%
   arrange(Date_collected) %>%
-  group_by(Plot, Trap) %>% 
+  group_by(Plot, Trap, species) %>% 
   # compute the difference between collection dates. For a series of
   # size n, diff() returns n-1 intervals, so we add one NA at the front
   # because the first date has no elapsed time (since no previous date)
   mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
   ungroup() %>%
-  arrange(Plot, Trap, Date_collected) %>% 
+  arrange(Plot, Trap, species, Date_collected) %>% 
   ## finally compute flux: litter per day
-  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
+  mutate(value_perday = value / elapsed_days) ->
   litter
 
 ```
@@ -123,8 +135,8 @@ test %>%
 
 # Examine: just the control 'A' trap in 2019
 litter %>% 
-  filter(Plot == "C", Trap == "A", year(Date_collected) == 2019) %>% 
-  select(Plot, Trap, Date_collected, All_Leaf) ->
+  filter(Plot == "C", Trap == "A", year(Date_collected) == 2019, species == "Leaf_All") %>% 
+  select(Plot, Trap, Date_collected, All_Leaf = value) ->
   litter_C_A_example
 
 # Generate a sequence between first and last collection dates
@@ -158,8 +170,8 @@ ggplot(litter_C_A_2019, aes(x = Date_collected, y = All_Leaf)) +
 ## Control trap A over all years
 
 litter %>% 
-  filter(Plot == "C", Trap == "A") %>% 
-  select(Plot, Trap, Date_collected, Year, All_Leaf) ->
+  filter(Plot == "C", Trap == "A", species == "Leaf_All") %>% 
+  select(Plot, Trap, Date_collected, Year, All_Leaf = value) ->
   litter_C_A_allyears
 
 # Compute the dates we want to complete()
@@ -229,7 +241,7 @@ This is a PITA! But this seems the best way to deal with it reproducibly.
 
 # Flag the first collections for each year, plot, trap
 litter %>% 
-  group_by(Year, Plot, Trap) %>% 
+  group_by(Year, Plot, Trap, species) %>% 
   # compare date collected with min date collected and assign it to "first"
   mutate(first = Date_collected == min(Date_collected)) %>% 
   ungroup() %>% 
@@ -240,11 +252,7 @@ litter %>%
 # Create artificial collections on 12/31 of the previous year
 litter %>% 
   filter(first) %>% 
-  mutate(Leaf_ACRU = PREV_YEAR_FRAC * Leaf_ACRU,
-         Leaf_FAGR = PREV_YEAR_FRAC * Leaf_FAGR,
-         Leaf_LITU = PREV_YEAR_FRAC * Leaf_LITU,
-         Leaf_Other = PREV_YEAR_FRAC * Leaf_Other,
-         All_Leaf = PREV_YEAR_FRAC * All_Leaf,
+  mutate(value = PREV_YEAR_FRAC * value,
          Date_collected = ymd(paste0(Year - 1, "-12-31")),
          Year = year(Date_collected)) ->
   inferred_end_of_year
@@ -252,22 +260,14 @@ litter %>%
 # Create artificial collections on 1/1 of the current year
 litter %>% 
   filter(first) %>% 
-  mutate(Leaf_ACRU = 0,
-         Leaf_FAGR = 0,
-         Leaf_LITU = 0,
-         Leaf_Other = 0,
-         All_Leaf = 0,
+  mutate(value = 0,
          Date_collected = ymd(paste0(Year, "-01-01"))) ->
   inferred_start_of_year
 
 # Adjust the first collections to 5% of their value
 litter %>% 
   filter(first) %>% 
-  mutate(Leaf_ACRU = (1 - PREV_YEAR_FRAC) * Leaf_ACRU,
-         Leaf_FAGR = (1 - PREV_YEAR_FRAC) * Leaf_FAGR,
-         Leaf_LITU = (1 - PREV_YEAR_FRAC) * Leaf_LITU,
-         Leaf_Other = (1 - PREV_YEAR_FRAC) * Leaf_Other,
-         All_Leaf = (1 - PREV_YEAR_FRAC) * All_Leaf) ->
+  mutate(value = (1 - PREV_YEAR_FRAC) * value) ->
   new_firsts
 
 # Combine these together and re-compute things
@@ -279,10 +279,10 @@ litter %>%
   bind_rows(new_firsts, inferred_end_of_year, inferred_start_of_year) %>% 
   # re-do the elapsed_days calculation
   arrange(Date_collected) %>%
-  group_by(Plot, Trap) %>% 
+  group_by(Plot, Trap, species) %>% 
   mutate(elapsed_days = c(NA, diff(Date_collected))) %>% 
   ungroup() %>%
-  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
+  mutate(value_perday = value / elapsed_days) ->
   litter_adjusted
 
 ```
@@ -291,8 +291,8 @@ Whew! Re-do the Control A example above:
 
 ```{r}
 litter_adjusted %>% 
-  filter(Plot == "C", Trap == "A") %>% 
-  select(Plot, Trap, Date_collected, Year, All_Leaf) ->
+  filter(Plot == "C", Trap == "A", species == "Leaf_All") %>% 
+  select(Plot, Trap, Date_collected, Year, All_Leaf = value) ->
   litter_C_A_allyears
 
 # Compute the dates we want to complete()
@@ -336,7 +336,7 @@ ggplot(litter_C_A_daily, aes(x = yday(Date_collected),
 
 litter_adjusted %>%
   arrange(Date_collected) %>%
-  group_by(Plot, Trap) %>% 
+  group_by(Plot, Trap, species) %>% 
   # compute the difference between collection dates. For a series of
   # size n, diff() returns n-1 intervals, so we add one NA at the front
   # because the first date has no elapsed time (since no previous date)
@@ -344,7 +344,7 @@ litter_adjusted %>%
   ungroup() %>%
   arrange(Plot, Trap, Date_collected) %>% 
   ## finally compute flux: litter per day
-  mutate(All_Leaf_perday = All_Leaf / elapsed_days) ->
+  mutate(value_perday = value / elapsed_days) ->
   litter_adj_perday
 
 # generating the sequence of dates from min day collected to max
@@ -353,38 +353,34 @@ days_wanted_adj <- seq(from = min(litter_adj_perday$Date_collected),
                    by = "day")
 
 litter_adj_perday %>%
-  complete(Plot, Trap, Date_collected = days_wanted_adj) %>%
-  mutate(All_Leaf_perday = na.approx(All_Leaf_perday, na.rm = FALSE)) ->
+  complete(Plot, Trap, species, Date_collected = days_wanted_adj) %>%
+  mutate(value_perday = na.approx(value_perday, na.rm = FALSE)) ->
   litter_adj_perday_complete
-
-# ALICE: I have simplified things above and changed it so we're not
-# filtering for control A anymore; we want to process and visualize
-# ALL the data.
 
 # 2. plot
 
-ggplot(litter_adj_perday_complete, aes(x = Date_collected, y = All_Leaf_perday, color = Plot)) +
+ggplot(litter_adj_perday_complete, aes(x = Date_collected, y = value, color = Plot)) +
   geom_point() +
-  facet_grid(Plot ~ .)
+  facet_grid(Plot ~ species)
 
 
 # Annual flux by plot and trap
 litter_adj_perday_complete %>%
   mutate(Year = year(Date_collected)) %>%
 # group by plot, trap, year
-  group_by(Plot, Trap, Year) %>%
+  group_by(Plot, Trap, Year, species) %>%
 # sum up the daily fluxes to an annual values
-  summarise(All_Leaf_peryear = sum(All_Leaf_perday), .groups = "drop") ->
+  summarise(value_peryear = sum(value_perday), .groups = "drop") ->
   litter_annual_fluxes
 
 # boxplot
-ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, group = paste(Year, Plot))) +
+ggplot(litter_annual_fluxes, aes(x = Year, y = value_peryear, color = Plot, group = paste(Year, Plot))) +
   geom_boxplot(na.rm = TRUE)
 
 
 # play around with different visualizations
 
-ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, group = paste(Year, Plot))) +
+ggplot(litter_annual_fluxes, aes(x = Year, y = value_peryear, color = Plot, group = paste(Year, Plot))) +
   scale_color_manual(values = c("green", "blue", "red")) +
   geom_boxplot(na.rm = TRUE)
 
@@ -394,13 +390,13 @@ ggplot(litter_annual_fluxes, aes(x = Year, y = All_Leaf_peryear, color = Plot, g
 
 
 ```{r}
-# sum all leaf by plot and year
+# Average by plot and species and year
 
 litter_ann_perplot_m2 <- litter_annual_fluxes %>%
   # 2018 was our first year and our data was incomplete
   filter(Year > 2018) %>% 
-  group_by(Plot, Year) %>%
-  summarise(All_Leaf_perplot = mean (All_Leaf_peryear, na.rm = TRUE),
+  group_by(Plot, Year, species) %>%
+  summarise(value_perplot = mean (value_peryear, na.rm = TRUE),
             .groups = "drop")
 
 
@@ -410,7 +406,7 @@ litter_ann_perplot_m2 <- litter_annual_fluxes %>%
 # Join data sets
 litter_precip_year <- left_join(litter_ann_perplot_m2, climdat, by = "Year")
 
-ggplot(litter_precip_year, aes(x = Precip_cm, y = All_Leaf_perplot, color = Plot)) +
+ggplot(litter_precip_year, aes(x = Precip_cm, y = value_perplot, color = Plot)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE) +
   labs(
@@ -430,7 +426,7 @@ ggplot(litter_precip_year, aes(x = Precip_cm, y = All_Leaf_perplot, color = Plot
 
 litter_par_year <- left_join(litter_ann_perplot_m2, climdat, by = "Year")
 
-ggplot(litter_par_year, aes(x = Srad_Ws_m2, y = All_Leaf_perplot, color = Plot)) +
+ggplot(litter_par_year, aes(x = Srad_Ws_m2, y = value_perplot, color = Plot)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE) +
   labs(
