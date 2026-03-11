@@ -359,8 +359,11 @@ litter_adj_perday %>%
 
 # 2. plot
 
+# Can we rearrange the panels? and highlight our focal species with a box??
+
 ggplot(litter_adj_perday_complete, aes(x = Date_collected, y = value, color = Plot)) +
   geom_point() +
+  scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
   facet_grid(Plot ~ species)
 
 
@@ -375,14 +378,13 @@ litter_adj_perday_complete %>%
 
 # boxplot
 ggplot(litter_annual_fluxes, aes(x = Year, y = value_peryear, color = Plot, group = paste(Year, Plot))) +
+  scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
   geom_boxplot(na.rm = TRUE)
 
 
 # play around with different visualizations
 
-ggplot(litter_annual_fluxes, aes(x = Year, y = value_peryear, color = Plot, group = paste(Year, Plot))) +
-  scale_color_manual(values = c("green", "blue", "red")) +
-  geom_boxplot(na.rm = TRUE)
+
 
 
 ```
@@ -414,7 +416,7 @@ ggplot(litter_precip_year, aes(x = Precip_cm, y = value_perplot, color = Plot)) 
     y = "Leaf Litter (g/m2/year)",
     color = "Plot"
   ) +
-   scale_color_manual(values = c("green", "blue", "red")) +
+   scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
   theme_minimal()
 
 
@@ -430,13 +432,44 @@ ggplot(litter_par_year, aes(x = Srad_Ws_m2, y = value_perplot, color = Plot)) +
   geom_point() +
   geom_smooth(method = "lm", se = TRUE) +
   labs(
-    x = "PAR (?)",
+    x = "PAR (w/m2)",
     y = "Leaf Litter (g/m2/year)",
     color = "Plot"
   ) +
-   scale_color_manual(values = c("green", "blue", "red")) +
+   scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
   theme_minimal()
 
 ```
  
+```{r}
+
+
+# can I omit all leaf here or do I have do make another data frame?
+
+ggplot(litter_ann_perplot_m2, aes(x = Year, y = value_perplot, color = species)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Plot) +
+  theme_bw() +
+  labs(
+    x = "Year",
+    y = "Value",
+    color = "Species"
+  )
+
+```
+
+```{r}
+# plot horizontal focal species by plot over time
+
+# poster questions:
+## can we see early senescence in the SW plot over time?
+  ## the SW treatment is 
+```
+
+```{r}
+# Phenology
+## plot each species over time per year; what does this look like?
+
+```
 
