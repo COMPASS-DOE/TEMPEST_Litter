@@ -359,12 +359,18 @@ litter_adj_perday %>%
 
 # 2. plot
 
-# Can we rearrange the panels? and highlight our focal species with a box??
 
-ggplot(litter_adj_perday_complete, aes(x = Date_collected, y = value, color = Plot)) +
+# Can we rearrange the panels? and highlight our focal species with a box??
+litter_adj_perday_complete %>%
+  filter(species != "Leaf_All") %>%
+  ggplot(aes(x = Date_collected, y = value, color = Plot)) +
   geom_point() +
   scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
-  facet_grid(Plot ~ species)
+    labs(
+    x = "Collection Date",
+    y = expression("Leaf Litter (g m"^{-2}~" year"^{-1}*")")
+   ) +
+  facet_grid(Plot ~ species) #, scales = "free_y")
 
 
 # Annual flux by plot and trap
@@ -390,6 +396,43 @@ ggplot(litter_annual_fluxes, aes(x = Year, y = value_peryear, color = Plot, grou
 ```
 
 
+```{r}
+# Average by plot and year and day across all 
+
+litter_mean_perday <- litter_adj_perday_complete %>%
+  # 2018 was our first year and our data was incomplete
+  # also remove 2026 data as it is incomplete
+ 
+  group_by(Date_collected, Plot, species) %>%
+  summarise(value_perplot = mean (value_perday, na.rm = TRUE)) %>% 
+  mutate (Year = year(Date_collected)) %>% 
+  filter(Year > 2018, Year < 2026) %>% 
+  ## filter for all leaf only; can change for spp level
+  filter(species == "Leaf_All")
+
+litter_perday_cum <- litter_mean_perday %>%
+  group_by(Plot, Year) %>% 
+  mutate(All_Leaf_Cumulative = cumsum(value_perplot))
+
+
+# graph
+
+ggplot(litter_mean_perday, aes(x = Date_collected, y = value_perplot)) + 
+  geom_point(na.rm = TRUE) +
+  facet_wrap(~Plot, ncol=1) +
+  ylab("Leaf Litter Flux (g/day)") +
+  xlab("Date") +
+  geom_vline(xintercept = ymd(paste0(2020:2025, "-01-01")), 
+             color = "blue", linetype = 2)
+#cumlative
+ggplot(litter_perday_cum, aes(x = yday(Date_collected),
+                             y = All_Leaf_Cumulative, 
+                             color = factor(Year))) +
+  geom_point(na.rm = TRUE) +
+  facet_grid(~Plot)
+
+```
+
 
 ```{r}
 # Average by plot and species and year
@@ -403,6 +446,7 @@ litter_ann_perplot_m2 <- litter_annual_fluxes %>%
             .groups = "drop")
 
 
+
 ```
 
 ```{r}
@@ -411,16 +455,16 @@ litter_precip_year <- left_join(litter_ann_perplot_m2, climdat, by = "Year")
 
 ggplot(litter_precip_year, aes(x = Precip_cm, y = value_perplot, color = Plot)) +
   geom_point() +
-  geom_smooth(method = "lm", se = TRUE) +
+  geom_smooth(method = "lm", se = TRUE, aes(fill = factor(Plot))) +
   labs(
     x = "Precipitation (cm/year)",
-    y = "Leaf Litter (g/m2/year)",
-    color = "Plot"
+    y = expression("Leaf Litter (g m"^{-2}~" year"^{-1}*")"),
+    color = "Plot",
+    fill = "Plot"
   ) +
    scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
-  theme_minimal()
-
-
+  theme_minimal() +
+  scale_fill_manual(values = c("forestgreen", "turquoise", "hotpink"))
 
 ```
  
@@ -461,14 +505,15 @@ ggplot(litter_ann_perplot_m2, aes(x = Year, y = value_perplot, color = species))
 
 # stacked area version:
 litter_ann_perplot_m2 %>%
-  filter (species != "Leaf_All") %>% 
+  filter (species != "Leaf_All") %>%
+  mutate(species = recode(species, "Leaf_ACRU" = "ACRU", "Leaf_FAGR" = "FAGR", "Leaf_LITU" = "LITU", "Leaf_Other" = "Other Spp"))
   ggplot(aes(x = Year, y = value_perplot, fill = species)) +
   geom_area(position = "stack") +
   facet_grid(Plot ~.) +
   theme_bw() +
   labs(
     x = "Year",
-    y = "Litter (g/m2/year)",
+    y = expression("Leaf Litter (g m"^{-2}~" year"^{-1}*")"),
     fill = "Species"
   )
 
