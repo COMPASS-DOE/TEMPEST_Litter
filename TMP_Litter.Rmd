@@ -362,13 +362,18 @@ litter_adj_perday %>%
 
 # Can we rearrange the panels? and highlight our focal species with a box??
 litter_adj_perday_complete %>%
-  filter(species != "Leaf_All") %>%
+  filter(species != "Leaf_All") %>% 
+  mutate(species = recode(species, 
+                          "Leaf_ACRU" = "ACRU", 
+                          "Leaf_FAGR" = "FAGR", 
+                          "Leaf_LITU" = "LITU", 
+                          "Leaf_Other" = "Other Spp")) %>% 
   ggplot(aes(x = Date_collected, y = value, color = Plot)) +
   geom_point() +
   scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
     labs(
     x = "Collection Date",
-    y = expression("Leaf Litter (g m"^{-2}~" year"^{-1}*")")
+    y = expression("Leaf Litter (g m"^{-2}~")")
    ) +
   facet_grid(Plot ~ species) #, scales = "free_y")
 
@@ -424,10 +429,13 @@ ggplot(litter_mean_perday, aes(x = Date_collected, y = value_perplot)) +
   xlab("Date") +
   geom_vline(xintercept = ymd(paste0(2020:2025, "-01-01")), 
              color = "blue", linetype = 2)
-#cumlative
+#cumulative
+litter_perday_cum$Year <- factor(litter_perday_cum$Year)
 ggplot(litter_perday_cum, aes(x = yday(Date_collected),
                              y = All_Leaf_Cumulative, 
-                             color = factor(Year))) +
+                             color = Year)) +
+  ylab("Cumulative Leaf Litter (g)") +
+  xlab("Day of Year") +
   geom_point(na.rm = TRUE) +
   facet_grid(~Plot)
 
@@ -473,16 +481,23 @@ ggplot(litter_precip_year, aes(x = Precip_cm, y = value_perplot, color = Plot)) 
 
 litter_par_year <- left_join(litter_ann_perplot_m2, climdat, by = "Year")
 
-ggplot(litter_par_year, aes(x = Srad_Ws_m2, y = value_perplot, color = Plot)) +
+ggplot(litter_par_year, aes(x = Tair2m_C, y = value_perplot, color = Plot)) +
   geom_point() +
-  geom_smooth(method = "lm", se = TRUE) +
+  geom_smooth(method = "lm", se = TRUE, aes(fill = factor(Plot))) +
   labs(
-    x = "PAR (w/m2)",
-    y = "Leaf Litter (g/m2/year)",
-    color = "Plot"
+    x = "Temperature C",
+     y = expression("Leaf Litter (g m"^{-2}~" year"^{-1}*")"),
+    color = "Plot",
+    fill = "Plot"
   ) +
    scale_color_manual(values = c("forestgreen", "turquoise", "hotpink")) +
-  theme_minimal()
+  theme_minimal() +
+  scale_fill_manual(values = c("forestgreen", "turquoise", "hotpink"))
+
+# test statistical significance
+
+mod <- lm (value_perplot ~ Tair2m_C * Plot, data = litter_par_year)
+anova (mod)
 
 ```
  
@@ -506,7 +521,11 @@ ggplot(litter_ann_perplot_m2, aes(x = Year, y = value_perplot, color = species))
 # stacked area version:
 litter_ann_perplot_m2 %>%
   filter (species != "Leaf_All") %>%
-  mutate(species = recode(species, "Leaf_ACRU" = "ACRU", "Leaf_FAGR" = "FAGR", "Leaf_LITU" = "LITU", "Leaf_Other" = "Other Spp"))
+  mutate(species = recode(species, 
+                          "Leaf_ACRU" = "ACRU", 
+                          "Leaf_FAGR" = "FAGR", 
+                          "Leaf_LITU" = "LITU", 
+                          "Leaf_Other" = "Other Spp")) %>% 
   ggplot(aes(x = Year, y = value_perplot, fill = species)) +
   geom_area(position = "stack") +
   facet_grid(Plot ~.) +
@@ -521,11 +540,7 @@ litter_ann_perplot_m2 %>%
 ```
 
 ```{r}
-# plot horizontal focal species by plot over time
 
-# poster questions:
-## can we see early senescence in the SW plot over time?
-  ## the SW treatment is 
 ```
 
 ```{r}
