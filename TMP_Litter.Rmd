@@ -499,6 +499,8 @@ ggplot(litter_par_year, aes(x = Tair2m_C, y = value_perplot, color = Plot)) +
 mod <- lm (value_perplot ~ Tair2m_C * Plot, data = litter_par_year)
 anova (mod)
 
+summary(mod)$r.squared
+
 ```
  
 ```{r}
